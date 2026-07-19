@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>정보 암기카드</title>
+<style>
+  /* ===== 기본 설정 ===== */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    font-family: "맑은 고딕", "Malgun Gothic", sans-serif;
+    background: #f4f1fb;      /* 연한 파스텔 보라 배경 */
+    color: #3a3a44;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; }
+
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    margin: 0 0 20px;
+    color: #6b5ca5;
+    letter-spacing: 1px;
+  }
+
+  /* ===== 공통 버튼 (직각) ===== */
+  button, select {
+    border: 1px solid #d7cff0;
+    border-radius: 0;                 /* 직각 */
+    background: #ffffff;
+    color: #4a4a55;
+    font-family: inherit;
+    font-size: 15px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #efeafb; }
+  button:active { background: #e4dcf7; }
+
+  /* ===== 주제 선택 ===== */
+  .topic-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .topic-row label { align-self: center; font-size: 14px; color: #7a7a88; }
+  .topic-row select { flex: 1; }
+
+  /* ===== 카드 (뒤집기) ===== */
+  .card {
+    perspective: 1000px;              /* 3D 느낌 */
+    width: 100%;
+    height: 260px;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s;
+    transform-style: preserve-3d;
+  }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+
+  .card-front, .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    border: 1px solid #e2dbf3;
+    box-shadow: 0 2px 6px rgba(120, 110, 170, 0.08);
+  }
+  .card-front { background: #fde9ef; }   /* 연분홍 앞면 */
+  .card-back  { background: #e4f1fb; transform: rotateY(180deg); }  /* 연하늘 뒷면 */
+
+  .card-label {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    font-size: 12px;
+    color: #9b93b3;
+  }
+  .card-text {
+    font-size: 20px;
+    line-height: 1.5;
+    text-align: center;
+    word-break: keep-all;
+  }
+  .card-hint {
+    position: absolute;
+    bottom: 12px;
+    font-size: 12px;
+    color: #b0a9c4;
+  }
+
+  /* 맞음/틀림 체크 버튼 (뒷면) */
+  .check-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .check-row button {
+    border-radius: 0;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+  .btn-o { background: #eafbf0; border-color: #cfeeda; color: #3f8f5f; }
+  .btn-o:hover { background: #dcf6e6; }
+  .btn-x { background: #fdeeee; border-color: #f2d5d5; color: #b56262; }
+  .btn-x:hover { background: #f9dede; }
+
+  /* 틀림 표시 배지 */
+  .mark-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 12px;
+    padding: 2px 7px;
+    background: #fdeeee;
+    border: 1px solid #f2d5d5;
+    color: #b56262;
+  }
+
+  /* ===== 진도 ===== */
+  .progress {
+    text-align: center;
+    font-size: 14px;
+    color: #8a83a0;
+    margin-bottom: 12px;
+  }
+
+  /* ===== 이동 버튼 줄 ===== */
+  .nav-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .nav-row button { flex: 1; }
+  .nav-row .shuffle { background: #eafbf0; border-color: #cfeeda; }
+  .nav-row .shuffle:hover { background: #dcf6e6; }
+
+  /* ===== 카드 관리 ===== */
+  .manage {
+    border-top: 1px solid #e2dbf3;
+    padding-top: 18px;
+  }
+  .manage-buttons { display: flex; gap: 8px; margin-bottom: 14px; }
+  .manage-buttons button { flex: 1; }
+  .btn-add  { background: #eef0fb; border-color: #d5d9f2; }
+  .btn-del  { background: #fdeeee; border-color: #f2d5d5; color: #b56262; }
+
+  /* ===== 입력 폼 ===== */
+  .form {
+    display: none;
+    background: #ffffff;
+    border: 1px solid #e2dbf3;
+    padding: 16px;
+  }
+  .form.show { display: block; }
+  .form h3 { margin: 0 0 12px; font-size: 16px; color: #6b5ca5; }
+  .form label { display: block; font-size: 13px; color: #7a7a88; margin: 10px 0 4px; }
+  .form input, .form textarea {
+    width: 100%;
+    border: 1px solid #d7cff0;
+    border-radius: 0;
+    padding: 9px;
+    font-family: inherit;
+    font-size: 15px;
+  }
+  .form textarea { resize: vertical; min-height: 56px; }
+  .form-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .form-actions button { flex: 1; }
+  .btn-save   { background: #eafbf0; border-color: #cfeeda; }
+  .btn-cancel { background: #f4f1fb; }
+
+  .empty {
+    text-align: center;
+    color: #9b93b3;
+    padding: 40px 0;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>정보 암기카드</h1>
+
+  <!-- 주제 선택 -->
+  <div class="topic-row">
+    <label>주제</label>
+    <select id="topicSelect"></select>
+  </div>
+
+  <!-- 카드 -->
+  <div id="cardArea"></div>
+
+  <!-- 진도 -->
+  <div class="progress" id="progress"></div>
+
+  <!-- 이동 버튼 -->
+  <div class="nav-row">
+    <button id="prevBtn">◀ 이전</button>
+    <button class="shuffle" id="shuffleBtn">🔀 섞기</button>
+    <button id="nextBtn">다음 ▶</button>
+  </div>
+
+  <!-- 카드 관리 -->
+  <div class="manage">
+    <div class="manage-buttons">
+      <button class="btn-add" id="addBtn">＋ 카드 추가</button>
+      <button id="editBtn">✎ 수정</button>
+      <button class="btn-del" id="delBtn">🗑 삭제</button>
+    </div>
+
+    <!-- 추가/수정 폼 -->
+    <div class="form" id="form">
+      <h3 id="formTitle">카드 추가</h3>
+      <label>주제</label>
+      <input id="fTopic" placeholder="예: 컴퓨터 구조">
+      <label>앞면 (문제)</label>
+      <textarea id="fFront" placeholder="예: CPU가 하는 일은?"></textarea>
+      <label>뒷면 (정답)</label>
+      <textarea id="fBack" placeholder="예: 계산하고 명령을 처리하는 두뇌 역할"></textarea>
+      <div class="form-actions">
+        <button class="btn-save" id="saveBtn">저장</button>
+        <button class="btn-cancel" id="cancelBtn">취소</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 데이터 ================= */
+const STORAGE_KEY = "flashcards";
+
+/* ===== Supabase 연결 (공개 읽기 전용) =====
+   publishable 키는 브라우저에 넣어도 되는 '공개용' 키예요.
+   실제 읽기 권한은 Supabase의 RLS(공개 읽기 정책)로 정해져요. */
+const SUPABASE_URL = "https://dyssjoczruokobcoiwka.supabase.co";
+const SUPABASE_KEY = "sb_publishable_tIKbZaw2N_ISaZQR5y0gUg_-8U9GVPU";
+const CLOUD_TOPIC = "알고리즘 (Supabase)";   // 클라우드 카드에 붙일 주제 이름
+const CLOUD_WRONG_KEY = "cloudWrong";         // 클라우드 카드의 '틀림' 표시 저장 칸
+
+// 클라우드(Supabase) 카드인지 구분 (id가 "sb-"로 시작)
+const isCloud = c => String(c.id).startsWith("sb-");
+
+// 처음 열 때 넣어줄 예시 카드 (정보 과목)
+const SEED = [
+  { topic: "정보 기초", front: "2진수는 어떤 숫자만 사용할까?", back: "0과 1, 두 가지만 사용해요." },
+  { topic: "정보 기초", front: "비트(bit)와 바이트(byte)의 관계는?", back: "1바이트 = 8비트예요." },
+  { topic: "컴퓨터 구조", front: "CPU가 하는 일은?", back: "계산하고 명령을 처리하는 컴퓨터의 두뇌예요." },
+  { topic: "컴퓨터 구조", front: "입력 장치의 예를 들어봐.", back: "키보드, 마우스처럼 정보를 넣는 장치예요." },
+  { topic: "컴퓨터 구조", front: "출력 장치의 예를 들어봐.", back: "모니터, 프린터처럼 정보를 보여주는 장치예요." },
+  { topic: "소프트웨어", front: "운영체제(OS)가 하는 일은?", back: "컴퓨터를 켜고 프로그램과 장치를 관리해요. 예: 윈도우." },
+  { topic: "소프트웨어", front: "응용 소프트웨어란?", back: "특정 일을 하려고 쓰는 프로그램. 예: 한글, 게임." },
+  { topic: "알고리즘·프로그래밍", front: "알고리즘이란?", back: "문제를 푸는 순서와 방법을 정해놓은 것이에요." },
+  { topic: "알고리즘·프로그래밍", front: "프로그래밍의 세 가지 기본 구조는?", back: "순차, 선택(조건), 반복이에요." },
+  { topic: "알고리즘·프로그래밍", front: "변수란?", back: "값을 담아두는 상자 같은 거예요." },
+  { topic: "네트워크·정보윤리", front: "인터넷이란?", back: "전 세계 컴퓨터를 서로 연결한 큰 통신망이에요." },
+  { topic: "네트워크·정보윤리", front: "개인정보를 지키려면?", back: "비밀번호를 남에게 알려주지 않고, 함부로 올리지 않아요." }
+];
+
+let cards = load();        // 전체 카드
+let view = [];             // 현재 주제로 걸러진 카드 (지금 보는 목록)
+let index = 0;             // view 안에서 몇 번째
+let editingId = null;      // 수정 중인 카드 id (없으면 추가 모드)
+
+/* ================= 저장/불러오기 ================= */
+function load() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try { return JSON.parse(saved); } catch (e) { /* 깨졌으면 아래로 */ }
+  }
+  // 저장된 게 없으면 예시 카드에 id를 붙여서 시작
+  return SEED.map((c, i) => ({ id: i + 1, ...c }));
+}
+function save() {
+  // 내(로컬) 카드만 저장 — 클라우드 카드는 매번 DB에서 새로 읽어옴
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cards.filter(c => !isCloud(c))));
+  // 클라우드 카드의 '틀림' 표시는 따로 저장 (id → true)
+  const wrongMap = {};
+  cards.filter(c => isCloud(c) && c.wrong).forEach(c => { wrongMap[c.id] = true; });
+  localStorage.setItem(CLOUD_WRONG_KEY, JSON.stringify(wrongMap));
+}
+function newId() {
+  // 로컬 카드 id는 숫자만 사용 (클라우드 id "sb-1" 등은 제외)
+  const nums = cards.map(c => c.id).filter(id => typeof id === "number");
+  return nums.length ? Math.max(...nums) + 1 : 1;
+}
+
+/* ===== Supabase에서 카드 읽어오기 (공개 읽기) ===== */
+async function fetchCloudCards() {
+  try {
+    const res = await fetch(
+      SUPABASE_URL + "/rest/v1/cards?select=id,front,back&order=id",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }
+    );
+    if (!res.ok) return [];
+    const rows = await res.json();
+    const wrongMap = JSON.parse(localStorage.getItem(CLOUD_WRONG_KEY) || "{}");
+    return rows.map(r => ({
+      id: "sb-" + r.id,
+      topic: CLOUD_TOPIC,
+      front: r.front,
+      back: r.back,
+      wrong: !!wrongMap["sb-" + r.id]
+    }));
+  } catch (e) {
+    return [];   // 인터넷이 안 되거나 아직 설정 전이면 조용히 건너뜀
+  }
+}
+
+/* ================= 화면 그리기 ================= */
+const $ = id => document.getElementById(id);
+
+function refreshTopics() {
+  const topics = [...new Set(cards.map(c => c.topic))];
+  const wrongCount = cards.filter(c => c.wrong).length;
+  const sel = $("topicSelect");
+  const current = sel.value || "전체";
+  sel.innerHTML =
+    '<option value="전체">전체 보기</option>' +
+    `<option value="__wrong__">⚠ 틀린 카드만 (${wrongCount})</option>` +
+    topics.map(t => `<option value="${t}">${t}</option>`).join("");
+  // 이전 선택 유지 (없으면 전체)
+  const valid = current === "전체" || current === "__wrong__" || topics.includes(current);
+  sel.value = valid ? current : "전체";
+}
+
+function applyFilter() {
+  const t = $("topicSelect").value;
+  if (t === "__wrong__")      view = cards.filter(c => c.wrong);   // 틀린 카드만
+  else if (t === "전체")       view = cards.slice();                // 전체
+  else                        view = cards.filter(c => c.topic === t);
+  index = 0;
+  render();
+}
+
+function render() {
+  const area = $("cardArea");
+
+  if (view.length === 0) {
+    const isWrongView = $("topicSelect").value === "__wrong__";
+    area.innerHTML = isWrongView
+      ? '<div class="empty">틀린 카드가 없어요! 👍<br>아주 잘하고 있어요.</div>'
+      : '<div class="empty">카드가 없어요.<br>아래 [＋ 카드 추가]로 만들어 보세요!</div>';
+    $("progress").textContent = "";
+    return;
+  }
+  if (index >= view.length) index = 0;
+
+  const c = view[index];
+  const badge = c.wrong ? '<div class="mark-badge">틀림</div>' : '';
+  area.innerHTML = `
+    <div class="card" id="card">
+      <div class="card-inner">
+        <div class="card-front">
+          <div class="card-label">${c.topic}</div>
+          ${badge}
+          <div class="card-text">${escapeHtml(c.front)}</div>
+          <div class="card-hint">카드를 눌러 정답 보기</div>
+        </div>
+        <div class="card-back">
+          <div class="card-label">${c.topic} · 정답</div>
+          ${badge}
+          <div class="card-text">${escapeHtml(c.back)}</div>
+          <div class="check-row">
+            <button class="btn-o">⭕ 맞았어요</button>
+            <button class="btn-x">❌ 틀렸어요</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  // 카드 클릭 → 뒤집기
+  $("card").addEventListener("click", () => $("card").classList.toggle("flipped"));
+  // 체크 버튼 (카드 뒤집힘과 겹치지 않게 stopPropagation)
+  area.querySelector(".btn-o").addEventListener("click", e => { e.stopPropagation(); markCard(true); });
+  area.querySelector(".btn-x").addEventListener("click", e => { e.stopPropagation(); markCard(false); });
+
+  $("progress").textContent = `${index + 1} / ${view.length}`;
+}
+
+// 입력한 글자를 그대로 안전하게 보여주기 (<, > 등 처리)
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, ch => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]
+  )).replace(/\n/g, "<br>");
+}
+
+/* ================= 이동 ================= */
+function move(step) {
+  if (view.length === 0) return;
+  index = (index + step + view.length) % view.length;  // 끝에서 처음으로 순환
+  render();
+}
+function shuffle() {
+  // Fisher–Yates 섞기
+  for (let i = view.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [view[i], view[j]] = [view[j], view[i]];
+  }
+  index = 0;
+  render();
+}
+
+/* ================= 맞음 / 틀림 체크 ================= */
+function markCard(correct) {
+  if (view.length === 0) return;
+  const target = cards.find(x => x.id === view[index].id);
+  if (target) target.wrong = !correct;   // 틀리면 표시, 맞으면 표시 지움
+  save();
+
+  const isWrongView = $("topicSelect").value === "__wrong__";
+  refreshTopics();                        // 드롭다운의 틀린 개수 갱신
+  if (isWrongView && correct) {
+    applyFilter();                        // '틀린 카드만' 볼 때 맞히면 목록에서 빠짐
+  } else {
+    move(1);                              // 다음 카드로 넘어가기
+  }
+}
+
+/* ================= 추가 / 수정 / 삭제 ================= */
+function openForm(mode) {
+  const form = $("form");
+  form.classList.add("show");
+  if (mode === "edit" && view.length) {
+    const c = view[index];
+    editingId = c.id;
+    $("formTitle").textContent = "카드 수정";
+    $("fTopic").value = c.topic;
+    $("fFront").value = c.front;
+    $("fBack").value = c.back;
+  } else {
+    editingId = null;
+    $("formTitle").textContent = "카드 추가";
+    $("fTopic").value = $("topicSelect").value === "전체" ? "" : $("topicSelect").value;
+    $("fFront").value = "";
+    $("fBack").value = "";
+  }
+  $("fTopic").focus();
+}
+function closeForm() {
+  $("form").classList.remove("show");
+  editingId = null;
+}
+function saveForm() {
+  const topic = $("fTopic").value.trim();
+  const front = $("fFront").value.trim();
+  const back  = $("fBack").value.trim();
+  if (!topic || !front || !back) {
+    alert("주제, 앞면, 뒷면을 모두 채워 주세요.");
+    return;
+  }
+  if (editingId) {
+    const c = cards.find(c => c.id === editingId);
+    if (c) { c.topic = topic; c.front = front; c.back = back; }
+  } else {
+    cards.push({ id: newId(), topic, front, back });
+  }
+  save();
+  closeForm();
+  refreshTopics();
+  // 방금 만지작한 주제로 맞춰서 보여주기
+  $("topicSelect").value = topic;
+  applyFilter();
+}
+function delCard() {
+  if (view.length === 0) return;
+  const c = view[index];
+  if (!confirm("이 카드를 삭제할까요?\n\n" + c.front)) return;
+  cards = cards.filter(x => x.id !== c.id);
+  save();
+  refreshTopics();
+  applyFilter();
+}
+
+/* ================= 버튼 연결 ================= */
+$("topicSelect").addEventListener("change", applyFilter);
+$("prevBtn").addEventListener("click", () => move(-1));
+$("nextBtn").addEventListener("click", () => move(1));
+$("shuffleBtn").addEventListener("click", shuffle);
+$("addBtn").addEventListener("click", () => openForm("add"));
+$("editBtn").addEventListener("click", () => openForm("edit"));
+$("delBtn").addEventListener("click", delCard);
+$("saveBtn").addEventListener("click", saveForm);
+$("cancelBtn").addEventListener("click", closeForm);
+
+/* ================= 시작 ================= */
+refreshTopics();
+applyFilter();               // 먼저 내 카드로 화면 그리기
+loadCloudThenRender();       // 그다음 Supabase 카드 불러와서 합치기
+
+async function loadCloudThenRender() {
+  const cloud = await fetchCloudCards();
+  if (cloud.length === 0) return;                       // 못 불러오면 그대로 둠
+  cards = [...cloud, ...cards.filter(c => !isCloud(c))]; // 클라우드 카드를 맨 앞에
+  refreshTopics();
+  applyFilter();
+}
+</script>
+</body>
+</html>
